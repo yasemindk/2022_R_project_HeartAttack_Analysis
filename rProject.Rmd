@@ -1,0 +1,604 @@
+---
+title: "Statistical Computing Final Project"
+author: "Yasemin Demirkaya ,Eda Adaş"
+output: html_document
+date: '2022-05-28'
+font-family: Gill Sans
+---
+
+## 1)Data Description
+
+We select healtcare dataset to analyze patients' stroke status association with other variables in dataset like hypertension, heart disease, BMI values, ever smoke or not etc. 
+
+Our Data Source: "https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset"
+
+## 2)Exploratory and descriptive data analysis:
+Data columns are:<br>
+-ID; <br>
+-Gender, categorical with female, male, other;<br>
+-Age, Quantitative;<br>
+-Hypertension, categorical with 1-0;<br>
+-Heart Disease, categorical with 1-0;<br>
+-Ever married, categorical with yes-no;<br>
+-Work Type, categorical with private, self-employed, Govt-job;<br>
+-Residence type, categorical with Urban-Rural;<br>
+-Average Glucose level, Quantitative;<br>
+-BMI, Quantitative;<br>
+-Smoking Status, categorical with formerly smoked, never smoked, smokes;<br>
+-Stroke, categorical with 1-0.
+
+### Install pacman ("package manager")
+```{r}
+if (!require("pacman")) install.packages("pacman")
+```
+
+### Load contributed packages with pacman
+```{r}
+pacman::p_load(pacman, party, rio, tidyverse, ggplot2, ggpubr, broom, AICcmodavg, patchwork, dplyr, usdm)
+```
+
+### Load Data
+```{r}
+df <- read_csv("healthcaredataset.csv")
+head(df,10)
+```
+
+
+## 3)DATA VISUALIZATION
+
+### a) BarChart
+
+#### Split patients based on stroke status to compare much easily
+
+```{r}
+no_stroke <- filter(df, stroke == "0") # for patients without stroke
+stroke <- filter(df, stroke == "1") # for patients with stroke
+```
+
+Based on stroke status compare patients smoking status:
+
+```{r}
+stroke %>%
+  dplyr::select(smoking_status) %>%
+  table() %>%  # Put data in appropriate format
+  barplot(
+    main   = "Smoking Status Of Patients With Stroke",
+    ylab   = "Frequency", 
+    xlab   = "Smoking Status",
+    col = c("red"))
+
+no_stroke %>%
+  dplyr::select(smoking_status) %>%
+  table() %>%  # Put data in appropriate format
+  barplot(
+    main   = "Smoking Status Of Patients Without Stroke",
+    ylab   = "Frequency", 
+    xlab   = "Smoking Status",
+    col = c("blue"))
+```
+
+Analysis: Patient with stroke formerly smoked ratio is higher than patient without stroke but other smoking status almost have same ratios.
+
+### b) Histogram
+
+```{r}
+hist(stroke$bmi,
+  breaks = 8,
+  main   = "Histogram of BMI of Patients With Stroke",
+  ylab   = "Frequency",
+  xlab   = "BMI of Patients With Stroke",
+  col    = heat.colors(12)
+  )
+
+hist(no_stroke$bmi,
+  breaks = 8,
+  main   = "Histogram of BMI of Patients Without Stroke",
+  ylab   = "Frequency",
+  xlab   = "BMI of Patients Without Stroke",
+  col    = topo.colors(12)
+  )
+```
+
+Analysis: According to Histograms, BMI of Patients with stroke has outlier and both histograms right skewed distribution.
+
+### c) Boxplot
+
+```{r}
+df %>%
+  dplyr::select(age,stroke) %>%
+  boxplot(
+    age ~ stroke, #1 for with stroke; 0 for not with stroke patients
+    data = .,
+    horizontal = T,  # Horizontal
+    notch  = T,      # Confidence interval for median
+    main   = "Boxplot of Age of Patient",
+    xlab   = "Age of Patient",
+    col    = "blue"  
+  )
+
+```
+
+Analysis: According to Boxplot, Patient with stroke boxplot has 2 outliers. If patients are older, patients maybe has increased risk of stroke. The mean age of the patients without stroke is about forty.
+The mean age of the patients with stroke is about seventy.
+<br>
+### d) SCATTERPLOTS
+
+```{r}
+stroke %>%
+  dplyr::select(avg_glucose_level:bmi) %>%
+  filter(bmi < 50) %>%  # filter out outlier
+  plot(
+    main = "Scatterplot of Average Glucose Level of Patients with Stroke",
+    xlab = "Average Glucose Level",
+    ylab = "BMI",
+    col = "red",
+    pch  = 20,      # "Plotting character" (small circle)
+  )
+stroke %>%
+  filter(bmi < 50) %>%  # filter out outlier
+  lm(bmi ~ avg_glucose_level, data = .) %>%
+  abline()
+
+no_stroke %>%
+  dplyr::select(avg_glucose_level:bmi) %>%
+  filter(bmi < 70) %>%  # filter out outlier
+  plot(
+    main = "Scatterplot of Average Glucose Level of Patients Without Stroke",
+    xlab = "Average Glucose Level",
+    ylab = "BMI",
+    col = "red",
+    pch  = 20,      # "Plotting character" (small circle)
+  )
+no_stroke %>%
+  filter(bmi < 70) %>%  # filter out outlier
+  lm(bmi ~ avg_glucose_level, data = .) %>%
+  abline()
+
+```
+
+Analisys: For better regression line we remove outliers on BMI values for patients with/without stroke. According to scatterplots patients with stroke have more average glucose level ratio based on BMI than patients without stroke.
+
+## 4)Central Limit Theorem
+
+Variable = Age;
+
+```{r}
+age <- df$age
+hist(age, col = "steelblue")
+```
+
+According to Histogram Population Age distribution is irregular.
+
+Set sample size=20:
+
+```{r}
+sample1 <- c()
+n = 4861
+for (i in 1:n){
+  sample1[i] = mean(sample(age, 20, replace=TRUE), na.rm=TRUE)
+}
+
+mean(sample1)
+sd(sample1)
+hist(sample1, col ='steelblue', xlab='Age', main='Sample size = 20')
+
+```
+
+According to histogram, samples' age distribution are more normal than population.
+
+If we increase sample size like 200 we see samples' age distribution become more normal:
+
+```{r}
+n = 4861
+for (i in 1:n){
+  sample1[i] = mean(sample(age, 200, replace=TRUE), na.rm=TRUE)
+}
+
+mean(sample1)
+sd(sample1)
+hist(sample1, col ='steelblue', xlab='Age', main='Sample size = 200')
+```
+
+## 5)Confidence Intervals
+
+- Using the stroke data table find a 95% confidence interval for the BMI:
+
+Calculate the mean:
+```{r}
+bmi_mean <- mean(stroke$bmi,na.rm = TRUE)
+print(bmi_mean)
+```
+Calculate the standard error of the mean:
+
+```{r}
+bmi_size <- length(stroke$bmi)
+bmi_Sd <- sd(stroke$bmi,na.rm = TRUE)
+bmi_standarterror <- bmi_Sd/sqrt(bmi_size)
+print(bmi_standarterror)
+```
+Find the t-score that corresponds to the confidence level:
+
+```{r}
+alpha = 0.05
+degrees.freedom = bmi_size - 1
+t.score = qt(p=alpha/2, df=degrees.freedom,lower.tail=F)
+print(t.score)
+```
+Calculate the margin of error and construct the confidence interval:
+
+```{r}
+  margin.error <- t.score * bmi_standarterror
+  lower.bound <- bmi_mean - margin.error
+  upper.bound <- bmi_mean + margin.error
+  print(c(lower.bound,upper.bound))
+```
+
+Analysis: Patients' with stroke has BMI value between 29.68127-31.26131 with 95% confidence.
+
+- Using the stroke data table find a 95% confidence interval for the Age:
+
+Calculate the mean:
+
+```{r}
+age_mean <- mean(stroke$age,na.rm = TRUE)
+print(age_mean)
+```
+Calculate the standard error of the mean:
+
+```{r}
+age_size <- length(stroke$age)
+age_Sd <- sd(stroke$age,na.rm = TRUE)
+age_standarterror <- age_Sd/sqrt(age_size)
+print(age_standarterror)
+```
+
+Find the t-score that corresponds to the confidence level:
+
+```{r}
+alpha = 0.05
+degrees.freedom = age_size - 1
+t.score = qt(p=alpha/2, df=degrees.freedom,lower.tail=F)
+print(t.score)
+```
+
+Calculate the margin of error and construct the confidence interval:
+
+```{r}
+  margin.error <- t.score * age_standarterror
+  lower.bound <- age_mean - margin.error
+  upper.bound <- age_mean + margin.error
+  print(c(lower.bound,upper.bound))
+```
+
+Analysis: Patients' are between 66.13960-69.31679 years old with 95% confidence.
+
+### 6)Transformation
+
+Quantitative variable: BMI
+
+```{r}
+hist(df$bmi,col="red")
+```
+
+According to histogram population distribution is Right Sweked.
+We apply Log transformation to BMI.
+
+```{r}
+Log_transformation_age <- log(df$bmi)
+hist(Log_transformation_age,main = "Log Transformation on Variable BMI",col = "red")
+```
+
+Now it has normal distribution because of Log transform. 
+
+## 7)Single t-test (Wilcoxon t-test)
+
+Here are the distributions of Patients' with stroke average glucose level by sex (using {ggplot2}):
+
+```{r}
+library(ggplot2)
+
+ggplot(stroke) +
+  aes(x = gender, y = avg_glucose_level) +
+  geom_boxplot(fill = "#0c4c8a") +
+  theme_minimal()
+```
+
+### a)Aim: 
+Compare the glucose level between male and female patients with stroke according to Wilcoxon t-test.
+
+### b)Hypothesis and level of significance:
+H0: Average Glucose level of female with stroke and male with stroke are equal.<br>
+H1: Average Glucose level of female with stroke and male with stroke are not equal.<br>
+Significance level of alpha: 0.05<br>
+Significance level of t-test: 0.004906 
+
+### c)Assumption Check:
+
+- We need to check whether the data follow a normal distribution:<br>
+
+```{r}
+hist(subset(stroke, gender == "Female")$avg_glucose_level,
+  main = "Average Glucose Level Of Female",
+  xlab = "Average Glucose Level",
+  col = c("red")
+)
+hist(subset(stroke, gender == "Male")$avg_glucose_level,
+  main = "Average Glucose Level Of Male",
+  xlab = "Average Glucose Level",
+  col = c("steelblue")
+)
+```
+
+The histograms show that both distributions do not seem to follow a normal distribution.
+
+### d)Indicate “which test you choose” “for what reason”?:
+
+The Wilcoxon test advantages, do not require the assumption of normality of distributions and can deal with outliers.
+
+### e)Result:
+
+```{r}
+test <- wilcox.test(stroke$avg_glucose_level ~ stroke$gender)
+test
+```
+
+The p-value is less than alpha. We reject the null hypothesis.
+
+### f)Conclusion:
+
+We cant say Patients' gender who with stroke effects average glucose level.
+
+### g)What can be Type-1 and Type-2 error here?:
+
+We reject null hypothesis but if null hypothesis is true we get Type-1 error.
+
+## 8)Paired t-test
+
+```{r}
+## samples creating from 14 patients with stroke and 14 patients without stroke for apply paired t test
+s1 <- sample_n(na.omit(stroke), size = 14) ## remove NA values for compare
+s2 <- sample_n(na.omit(no_stroke), size = 14)
+sample_p <- rbind(s2, s1)
+sample_p
+```
+
+```{r}
+ggboxplot(sample_p, x = "stroke", y = "age",
+          order = c("1", "0"),
+          ylab = "age", xlab = "stroke",)
+```
+
+### a)Aim:
+
+Look for age and stroke status effects each other.
+
+### b)Hypothesis and level of significance:
+
+Significance level alpha: 0.05.<br>
+H0: Average age of patients are equal for each stroke status.<br>
+H1: Average age of patients are not equal for each stroke status.
+
+### c)Assumption Check:
+
+- Are the two samples paired? Yes.<br>
+- Is this a large sample? No because sample_p size less than 30.<br>
+- Normality check<br>
+Null hypothesis: the data are normally distributed<br>
+Alternative hypothesis: the data are not normally distributed<br>
+
+```{r}
+# compute the difference
+d <- with(sample_p, 
+        age[stroke == "0"] - age[stroke == "1"])
+# Shapiro-Wilk normality test for the differences
+shapiro.test(d)
+```
+From the output, the p-value is greater than the significance level 0.05 implying that the distribution of the differences (d) are not significantly different from normal distribution. In other words, we can assume the normality.
+
+### d)Result:
+
+Compute t-test:
+
+```{r}
+res <- t.test(age ~ stroke, data = sample_p, paired = TRUE)
+res
+```
+
+The p-value less than the significance level alpha = 0.05. We reject null hypothesis.
+
+### e)Conclusion:
+
+We can't say ages are equal for patients who with stroke and without stroke.
+
+## 9)Fisher’s exact test for count data
+
+```{r}
+table1 <- table(df$stroke,df$heart_disease)
+mosaicplot(table1, color = c("red","blue"), xlab = "stroke", ylab = "Heart disease",main = "Heart disease visualization based on stroke status")  
+```
+
+### a)Aim:
+
+Find association between stroke status and heart disease.
+
+### b)Hypothesis and level of significance:
+
+H0: Stroke and heart disease are independent.<br>
+H1: Stroke and heart disease are not independent.<br>
+Significance level alpha: 0.05.<br>
+Significance level of fisher test: 7.283e-15
+
+### c)Result:
+
+```{r}
+test <- fisher.test(table(df$stroke,df$heart_disease))
+test
+```
+
+P value =  7.283e-15 so its less than 0.05. We reject Null hypothesis.
+
+### d)Conclusion:
+
+We can't say heart disease and stroke are independent.
+
+### e)Odds Ratio:
+
+The odd ratio indicates that the odds of "heart disease while without stroke" is 4.70356 times than "with stroke and heart disease".
+
+## 10)ANOVA and Tukey Test
+
+### a)Aim:
+
+BMI value is same or not for patients based on smoking status.
+
+### b)Hypothesis and level of significance:
+
+Significance level alpha: 0.05.<br>
+H0: BMI has same mean for all patients based on smoking status.<br>
+H1: BMI has not same mean for all patients based on smoking status.
+
+### c)Assumption Check:
+
+Assumption #1: Normality: Our data has 5110 values so it has normal distributions.
+
+Assumption #2: Equal Variance
+
+```{r}
+boxplot(bmi ~ smoking_status, xlab='Smoking status', ylab='BMI', data=df)
+```
+
+They has equal variance for each smoking group.<br>
+Assumption #3: Independence<br>
+The observations in each group are independent of the observations in every other group.
+
+### d)Result of ANOVA:
+
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+library(tidyverse)
+library(broom)
+library(AICcmodavg)
+
+one.way <- aov(bmi ~ smoking_status, data = df)
+summary(one.way)
+```
+
+P value is 0.0239(<0.05) so we can conclude that there are significant differences between the BMI of patients based on smoking status.
+
+### e)Conclusion of ANOVA:
+
+We can say BMI means are not equal for all patients who smokes, never smoked or formerly smoked. 
+
+### f)Result of Tukey:
+
+Tukey test
+
+```{r}
+TukeyHSD(one.way, conf.level=.95) 
+```
+
+A Tukey post-hoc test revealed significant pairwise differences between smokes-never smoked, with an average difference of 0.5  (p > 0.05). The pairwise comparisons show that formerly smoked has a significantly higher mean BMI than both smoked and never smoked, after that smokes comes and last one is never smoked.
+
+### g)Conclusion of Tukey:
+
+Patients who formerly smoked has higher BMI than patients who smoked. Patients who smoked has higher BMI mean than patients never smoked.<br>
+
+## 11)Multiple Linear Regression
+
+### a)Aim:
+
+Predict Stroke status with best model. Find best fit variables for best model.
+
+### b)Regression Equation:
+
+lm(formula = stroke ~ ., data = na.omit(df2)) ## all data except id<br>
+Try all variables in our data except id of patient.
+
+```{r}
+df2 <- df[,!(names(df) %in% c("id"))] ## remove id for better results
+model <- lm(stroke ~ ., data = na.omit(df2))
+summary(model)
+```
+
+In our example, it can be seen that p-value of the F-statistic is < 2.2e-16, which is highly significant. This means that, at least, one of the predictor variables is significantly related to the outcome variable.
+To see which predictor variables are significant, examine the coefficients table, which shows the estimate of regression beta coefficients and the associated t-statitic p-values:
+
+```{r}
+summary(model)$coefficient
+```
+
+### c)Hypothesis and level of significance:
+
+H0: All variables in data, effect equally to stroke status.<br>
+H1: All variables in data, not effect equally to stroke status.<br>
+Significance level of model : p < 2.2e-16
+
+### d)Find the Best Model:
+
+```{r}
+model.final <- step(model)
+```
+
+```{r}
+model.final
+```
+
+### e)Assumption Check:
+
+-Linear relationship
+
+```{r}
+plot(model.final)
+```
+
+- Multivariate normality:
+
+```{r}
+hist(df$age)
+hist(df$avg_glucose_level)
+```
+
+- No or little multicollinearity.<br>
+- No auto-correlation.<br>
+- Homoscedasticity.<br>
+
+### f)Result:
+
+```{r}
+summary(model.final)
+```
+
+### g)Conclusion:
+
+According to best model age, hypertension, heart disease, married status :) and glucose level related with patients stroke status. Not all variables effect equally stroke status.
+
+### h)Prediction:
+
+In our data stroke status has 2 value (1-0). We analyze stroke association with other variables in our data so predict result generally between in 1-0 not 1 or 0. But we can make inferences from this results to with some examples.<br>
+- First example:<br>
+If patient is 50 years old, has hypertension whit has value = 1, and no heart disease with value 0, ever married is Yes and glucose level is 180.02.
+
+```{r}
+new <- data.frame(age=c(50), hypertension=c(1), heart_disease=c(0), ever_married=c("Yes"), avg_glucose_level=c(180.02))
+
+#use the fitted model to predict the rating for the new player
+predict(model.final, newdata=new)
+```
+
+Predict value is 0.1123055 so patient has probability of stroke but not too much.<br>
+
+- Second example:<br>
+Age 70,has hypertension and heart disease (1), ever married yes and glucose level is 280.02.
+
+```{r}
+new <- data.frame(age=c(70), hypertension=c(1), heart_disease=c(1), ever_married=c("Yes"), avg_glucose_level=c(280.02))
+
+#use the fitted model to predict the rating for the new player
+predict(model.final, newdata=new)
+```
+
+Predictionn value increase: 0.2629026<br>
+That means for patients that older, has hypertension and heart disease, has more glucose level are higher probability than other ones to get stroke. 
+
